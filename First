@@ -1,0 +1,81 @@
+import subprocess
+import time
+import logging
+from IP_Clients import Colors
+import argparse
+import sys
+
+
+class Parser:
+	def __init__(self):
+		self.args = argparse.ArgumentParser(description="Program to change your MAC address and hidden IP and DNS")
+		self.args.add_argument("-i", help="Interface to change MAC on", type=self.validate_interface)
+		self.args.add_argument("--mac", help="The new MAC address you want")
+		self.args.add_argument("--save-mac", help="Output your old MAC to a file", action='store_true')
+
+		self.args_parsed = self.args.parse_args()
+		self.args_dict = vars(self.args_parsed)
+
+	def return_dict(self):
+		return self.args_dict
+
+	def get_interface(self):
+		return self.args_parsed.i
+
+	def get_mac(self):
+		return self.args_parsed.mac
+
+	def error(self, error):
+		return Colors.red_color(f"\n[-] {str(error)}")
+
+	def validate_interface(self, interface):
+		interface_list = ["wlan0", "eth0"]
+
+		if not interface in interface_list:
+			print(self.error("Invalid interface."))
+			exit()
+		return interface
+
+
+class MacChanger(Parser):
+	def __init__(self):
+		super().__init__()
+		self.interface = self.get_interface()
+		self.mac_address = self.get_mac()
+
+	def change_mac(self):
+		iface = self.interface
+		mac = self.mac_address
+		subprocess.call(["ifconfig", iface, "down"])
+		subprocess.call(["ifconfig", iface, "hw", "ether", mac])
+		subprocess.call(["ifconfig", iface, "up"])
+		return f"\n[+] New mac --> {str(mac)}"
+
+	def save_mac(self):  # save the mac
+		interface = subprocess.check_output(["ifconfig", self.interface]).decode()
+		get_mac = re.search("ether.*", interface).group(0)
+		return get_mac[6:20]
+
+	def make_file(self):
+		old_mac = self.save_mac()
+
+		with open("old_mac.txt", "w") as f:
+			f.write(f"Old Mac: {str(old_mac)}")
+			f.close()
+		return 
+
+if __name__ == '__main__':
+	try:
+		arguments = Parser().return_dict()
+		
+		if arguments.get("save_mac"):
+			MacChanger().make_file()
+			result = MacChanger().change_mac()
+		else:
+			result = MacChanger().change_mac()
+			
+		print(result)
+		
+		
+	except IndexError:
+		print("Index error")
